@@ -124,6 +124,8 @@ def run() -> None:
     study.set_user_attr("timeframe", cfg["timeframe"])
 
     study.optimize(objective, n_jobs=cfg["n_jobs"], n_trials=cfg["n_trials"])
+    # best_params = study.study.best_params
+    # objective(best_params)
 
 
 def get_config():
@@ -215,7 +217,13 @@ def objective(trial):
     if ratio < 0:
         return np.nan
 
-    score = total_effect_rate * ratio_normalized
+    ratio_score = total_effect_rate * ratio_normalized
+    score = (
+        (0.80 * ratio_score)
+        + (0.10 * training_data_metrics["win_rate"])
+        + (0.06 * (1 + (training_data_metrics["max_drawdown"] / 100)))
+        + (0.04 * min(1, max(0, training_data_metrics["expectancy_percentage"])))
+    )
 
     try:
         testing_data_metrics = backtest_function(
@@ -359,9 +367,9 @@ def backtest_function(start_date, finish_date, hp, cfg):
         "type": cfg["type"],
     }
 
-    backtest_data = backtest(config, route, extra_routes, candles, candles_warmup, hyperparameters=hp)[
-        "metrics"
-    ]
+    backtest_data = backtest(
+        config, route, extra_routes, candles, candles_warmup, hyperparameters=hp
+    )["metrics"]
 
     if backtest_data["total"] == 0:
         backtest_data = {
